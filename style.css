@@ -142,3 +142,37 @@
 .player-keyboard details[open]{flex-basis:100%;min-width:0}.player-keyboard details>div{padding:12px;border:1px solid #535e68;border-radius:7px;background:#20252a;line-height:1.65;overflow-wrap:anywhere}
 .player-keyboard dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 12px}.player-keyboard dd{margin:0}.player-keyboard kbd{border:1px solid #737d89;border-radius:4px;padding:2px 5px;background:#12171d;color:#fff}
 .player-keyboard :is(button,summary):focus-visible{outline:2px solid #f0ce88;outline-offset:3px}.player-keyboard :is(button,summary):hover{background:#36414b}
+
+/* Coordinator Tool Switcher & Panels */
+.coordinator-tool-switcher{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 20px}
+.coord-tool-card{display:flex;flex-direction:column;gap:5px;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color .15s ease,background-color .15s ease;min-height:68px}
+.coord-tool-card:hover{background:#25282c;border-color:#555b64}
+.coord-tool-card[aria-selected="true"]{border-color:var(--accent);background:#2b2820}
+.coord-tool-title{display:flex;align-items:center;gap:8px}
+.coord-tool-title strong{font-size:14px;color:var(--ink);font-weight:650}
+.coord-tool-card[aria-selected="true"] .coord-tool-title strong{color:var(--accent)}
+.coord-tool-desc{font-size:11px;color:var(--muted);line-height:1.4;margin:0}
+.coord-panel[hidden]{display:none!important}
+
+/* Direction Brief Planner UI */
+.direction-role-count{color:var(--accent);font-weight:normal;font-size:12px;margin-left:6px}
+.direction-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.direction-chip{font-size:11px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;background:#15181a;color:var(--muted);cursor:pointer;transition:all .15s ease}
+.direction-chip:hover{border-color:var(--accent);color:var(--ink);background:#23211c}
+.direction-filter-label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;padding-left:4px}
+.direction-filter-label input{width:16px;height:16px;accent-color:var(--accent)}
+.direction-part-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.direction-part-actions button,.direction-part-actions a{padding:8px 12px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#1b1d20;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
+.direction-part-actions button:hover,.direction-part-actions a:hover{border-color:var(--accent);color:var(--accent)}
+.direction-part-actions .direction-btn-add{background:#2b261b;border-color:#655435;color:var(--accent)}
+.direction-part-actions .direction-btn-add:hover{background:#3b3221;border-color:var(--accent)}
+.direction-summary{margin-top:20px;padding:16px;border:1px solid #4a4536;border-radius:10px;background:#201e18}
+.direction-summary #directionTotals{margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.direction-summary #directionTotals strong{font-size:14px;color:var(--accent)}
+.direction-summary #directionTotals span{font-size:12px;color:var(--muted)}
+@media(max-width:600px){
+  .coordinator-tool-switcher{grid-template-columns:1fr;gap:8px}
+  .coord-tool-card{min-height:56px;padding:10px 12px}
+  .direction-part-actions button,.direction-part-actions a{flex:1 1 auto;justify-content:center}
+}
+
