@@ -146,7 +146,27 @@ const AXES=['환경','시간대','극적 상황','감정·분위기','행동','�
 const ALL_SCENES=VIDEOS.flatMap(v=>v.segments.filter(s=>s.review.status!=='pending').map(s=>({...s,referenceExclusion:(v.referenceExcludedRanges||[]).find(r=>s.startMs<r.endMs&&s.endMs>r.startMs)?.reason||null,videoId:v.id,key:v.id+'::'+s.id,use:s.use||[],why:s.why||''})));
 const SCENES=ALL_SCENES.filter(s=>!s.referenceExclusion);
 const flatTags=s=>Object.values(s.groups||{}).flat();
-const facetValues=(s,axis)=>uniq((s.groups?.[axis]||[]).flatMap(t=>t.split(/[·→]/).map(x=>x.trim()).filter(Boolean)));
+const FACET_CACHE=new WeakMap();
+function facetValues(s,axis){
+ let cache=FACET_CACHE.get(s);
+ if(!cache){cache=new Map();FACET_CACHE.set(s,cache);}
+ let values=cache.get(axis);
+ if(values===undefined){
+  values=uniq((s.groups?.[axis]||[]).flatMap(t=>t.split(/[·→]/).map(x=>x.trim()).filter(Boolean)));
+  cache.set(axis,values);
+ }
+ return values;
+}
+let ALL_FACET_TAGS=null;
+function getAllFacetTags(){
+ if(!ALL_FACET_TAGS){
+  ALL_FACET_TAGS=new Map();
+  for(const axis of AXES){
+   ALL_FACET_TAGS.set(axis,uniq(SCENES.flatMap(s=>facetValues(s,axis))).sort((a,b)=>a.localeCompare(b,'ko')));
+  }
+ }
+ return ALL_FACET_TAGS;
+}
 const uniq=a=>[...new Set(a)];
 const compact=s=>String(s).normalize('NFKC').toLowerCase().replace(/\s+/g,'');
 // Query vocabulary only. These are search equivalents, never new observed tags.
@@ -586,7 +606,7 @@ const selected=new Map();
 const selectedCount=()=>[...selected.values()].reduce((n,s)=>n+s.size,0);
 const isSelected=(axis,t)=>selected.get(axis)?.has(t)||false;
 function toggleTag(axis,t){if(!selected.has(axis))selected.set(axis,new Set());const set=selected.get(axis);set.has(t)?set.delete(t):set.add(t);if(!set.size)selected.delete(axis);}
-function categoryMatches(s){return [...selected].every(([axis,tags])=>[...tags].some(t=>[...(s.groups[axis]||[]),...facetValues(s,axis)].some(value=>canon(value)===canon(t))));}let scope='all',highlightsOnly=false,browseAll=false,current=null,currentVideo=null,playerLoaded=false;let resultLimit=100,lastSearchKey='';
+function categoryMatches(s){return [...selected].every(([axis,tags])=>{const sTags=[...(s.groups?.[axis]||[]),...facetValues(s,axis)];return [...tags].some(t=>sTags.some(value=>canon(value)===canon(t)));});}let scope='all',highlightsOnly=false,browseAll=false,current=null,currentVideo=null,playerLoaded=false;let resultLimit=100,lastSearchKey='';
 const $=s=>document.querySelector(s);
 let keywordRanks=new Map(),keywordMatches=new Map(),keywordSearchCache=null,keywordSearchTimer=null;const rowDetailsOpen=new Set();
 const queryInterpretation=document.createElement('p');queryInterpretation.id='keywordInterpretation';queryInterpretation.hidden=true;queryInterpretation.setAttribute('role','status');queryInterpretation.setAttribute('aria-live','polite');$('#searchHelp').closest('.searchmeta').append(queryInterpretation);
@@ -603,7 +623,7 @@ function coverageText(v){if(v.durationMs===null)return '전체 길이 미확인 
 function setVideo(v){currentVideo=v.id;const first=SCENES.find(s=>s.videoId===v.id);current=first?.key||null;playerLoaded=false;}
 function tagButton(axis,t){return `<button type="button" class="filtertag" data-axis="${esc(axis)}" data-tag="${esc(t)}" aria-pressed="${isSelected(axis,t)}">${esc(t)}</button>`;}
 function scopeMatches(s){return scope==='all'||s.videoId===scope||(scope.startsWith('game:')&&videoById(s.videoId)?.game===scope.slice(5));}
-function renderFacets(){const relevant=SCENES.filter(scopeMatches);const open=new Set([...document.querySelectorAll('.facet[open]')].map(x=>x.dataset.axis));$('#facets').innerHTML=AXES.map(axis=>{const tags=uniq(relevant.flatMap(s=>facetValues(s,axis))).sort((a,b)=>a.localeCompare(b,'ko'));return `<details class="facet" data-axis="${axis}" ${open.has(axis)?'open':''}><summary>${axis}<span class="facetcount">${tags.length}</span></summary><label class="sr-only" for="facet-${AXES.indexOf(axis)}">${axis} 선택지 검색</label><input class="facetsearch" id="facet-${AXES.indexOf(axis)}" type="search" placeholder="이 분류에서 찾기" autocomplete="off"><div class="facetlist">${tags.length?tags.map(t=>tagButton(axis,t)).join(''):'<span class="no-tags">이 분류의 관찰 태그가 아직 없습니다.</span>'}</div><p class="facet-hint">복수 선택은 하나라도 일치 · 다른 분류와는 모두 일치</p></details>`;}).join('');}
+function renderFacets(){const isAll=scope==='all';const relevant=isAll?SCENES:SCENES.filter(scopeMatches);const allTagsMap=isAll?getAllFacetTags():null;const open=new Set([...document.querySelectorAll('.facet[open]')].map(x=>x.dataset.axis));$('#facets').innerHTML=AXES.map(axis=>{const tags=isAll?allTagsMap.get(axis):uniq(relevant.flatMap(s=>facetValues(s,axis))).sort((a,b)=>a.localeCompare(b,'ko'));return `<details class="facet" data-axis="${axis}" ${open.has(axis)?'open':''}><summary>${axis}<span class="facetcount">${tags.length}</span></summary><label class="sr-only" for="facet-${AXES.indexOf(axis)}">${axis} 선택지 검색</label><input class="facetsearch" id="facet-${AXES.indexOf(axis)}" type="search" placeholder="이 분류에서 찾기" autocomplete="off"><div class="facetlist">${tags.length?tags.map(t=>tagButton(axis,t)).join(''):'<span class="no-tags">이 분류의 관찰 태그가 아직 없습니다.</span>'}</div><p class="facet-hint">복수 선택은 하나라도 일치 · 다른 분류와는 모두 일치</p></details>`;}).join('');}
 function renderRegistry(){$('#inventoryProof').textContent=CATALOGUE.inventoryEvidence||'전체 수집 목록 대조 전입니다.';const complete=VIDEOS.filter(v=>v.coverage.complete).length;const partial=VIDEOS.filter(v=>!v.coverage.complete&&v.segments.some(s=>s.review.status!=='pending')).length;const pending=VIDEOS.length-complete-partial;$('#catalogueStats').textContent=`등록 ${VIDEOS.length}편 · 연속 검수 완료 ${complete} · 검토 중 ${partial} · 대기 ${pending}`;$('#inventoryStatus').textContent=CATALOGUE.inventoryComplete?'수집 목록 대조 완료 · 음성/자막 적합성 별도 확인':'수집 목록 확인 중 · 현재 등록분만 집계';$('#videoScope').innerHTML='<option value="all">전체 등록 영상</option>'+uniq(VIDEOS.map(v=>v.game).filter(Boolean)).map(game=>`<option value="game:${esc(game)}">작품: ${esc(game)}</option>`).join('')+VIDEOS.map(v=>`<option value="${esc(v.id)}">${esc(v.title)} · ${statusLabel(v)}</option>`).join('');$('#videoScope').value=scope;$('#videoRegistry').innerHTML=VIDEOS.map(v=>`<button class="video-entry ${v.id===currentVideo?'current':''}" type="button" data-video="${esc(v.id)}"><span>${esc(v.title)}</span><small>${esc(v.game||'한국어 공식 채널')} · ${v.durationMs===null?'길이 미확인':fmt(v.durationMs)} · ${statusLabel(v)}${/일본어\s*더빙/.test(v.title)?' · 일본어 더빙(제목 표기)':''}</small></button>`).join('');}
 function intervalView(v){const out=[];let pos=0;for(const s of v.segments){if(s.startMs>pos)out.push({startMs:pos,endMs:s.startMs,status:'pending'});out.push({startMs:s.startMs,endMs:s.endMs,status:s.review.status,scene:s.review.status==='pending'?null:ALL_SCENES.find(x=>x.videoId===v.id&&x.id===s.id)});pos=s.endMs;}if(v.durationMs!==null&&pos<v.durationMs)out.push({startMs:pos,endMs:v.durationMs,status:'pending'});return out;}
 function renderCoverage(v){$('#languageStatus').textContent=languageNote(v);$('#coverageTitle').textContent=v.title;$('#coverageState').textContent=statusLabel(v);$('#coverageNumbers').textContent=coverageText(v);$('#coverageSample').textContent=`프레임 기반 근사 구간 ${secLabel(v.coverage.sampledMs)} · 연속 검수 ${secLabel(v.coverage.verifiedMs)} · FX 연속 검수 ${secLabel(v.coverage.fxVerifiedMs||0)}`;
@@ -639,7 +659,7 @@ function render(refreshViewer=false){clearTimeout(keywordSearchTimer);$('#cards'
 function searchNow(e){if(e)e.preventDefault();clearTimeout(keywordSearchTimer);browseAll=false;if(e?.type==='input'&&window.KeywordSentenceSearch&&$('#query').value.trim()){queryInterpretation.hidden=false;queryInterpretation.textContent='검색어를 정리하고 있습니다…';$('#cards').setAttribute('aria-busy','true');if(e.isComposing)return;keywordSearchTimer=setTimeout(()=>render(),180);return;}render();}
 function resetConditions(){window.CutRadarFineSearch?.clear();selected.clear();$('#query').value='';highlightsOnly=false;browseAll=false;scope='all';$('#videoScope').value='all';renderFacets();render();}
 $('#browseAllScenes').addEventListener('click',()=>{const next=!browseAll;resetConditions();browseAll=next;render();});
-$('#moreResults').addEventListener('click',()=>{resultLimit+=100;render();});$('#searchForm').addEventListener('submit',searchNow);['input','change','search','compositionend'].forEach(event=>$('#query').addEventListener(event,searchNow));$('#clearSearch').addEventListener('click',()=>{browseAll=false;$('#query').value='';render();$('#query').focus();});$('#resetFilters').addEventListener('click',()=>{browseAll=false;selected.clear();render();});$('#videoScope').addEventListener('change',()=>{browseAll=false;scope=$('#videoScope').value;window.CutRadarFineSearch?.clear();selected.clear();renderFacets();render();});$('#clearConditions').addEventListener('click',resetConditions);$('#highlightToggle').addEventListener('click',()=>{browseAll=false;highlightsOnly=!highlightsOnly;render();});$('#mobileFilter').addEventListener('click',()=>{const open=$('#filters').classList.toggle('open');$('#mobileFilter').setAttribute('aria-expanded',String(open));$('#mobileFilter').textContent=open?'필터 −':'필터 +';});
+$('#moreResults').addEventListener('click',()=>{resultLimit+=100;render();});$('#searchForm').addEventListener('submit',e=>{if(window.innerWidth<=900)$('#query')?.blur();searchNow(e);});$('#query').addEventListener('keydown',e=>{if(e.key==='Enter'&&window.innerWidth<=900)$('#query')?.blur();});['input','change','search','compositionend'].forEach(event=>$('#query').addEventListener(event,searchNow));$('#clearSearch').addEventListener('click',()=>{browseAll=false;$('#query').value='';render();$('#query').focus();});$('#resetFilters').addEventListener('click',()=>{browseAll=false;selected.clear();render();});$('#videoScope').addEventListener('change',()=>{browseAll=false;scope=$('#videoScope').value;window.CutRadarFineSearch?.clear();selected.clear();renderFacets();render();});$('#clearConditions').addEventListener('click',resetConditions);$('#highlightToggle').addEventListener('click',()=>{browseAll=false;highlightsOnly=!highlightsOnly;render();});$('#mobileFilter').addEventListener('click',()=>{const open=$('#filters').classList.toggle('open');$('#mobileFilter').setAttribute('aria-expanded',String(open));$('#mobileFilter').textContent=open?'필터 −':'필터 +';});
 document.addEventListener('click',e=>{const t=e.target instanceof Element?e.target:null;if(!t)return;if(t.closest('[data-clear-query]')){browseAll=false;$('#query').value='';render();return;}if(t.closest('[data-clear-highlight]')){browseAll=false;highlightsOnly=false;render();return;}const tag=t.closest('[data-tag]');if(tag){browseAll=false;toggleTag(tag.dataset.axis,tag.dataset.tag);render();return;}const q=t.closest('[data-query]');if(q){browseAll=false;selected.clear();$('#query').value=q.dataset.query;render();return;}const pick=t.closest('[data-select]');if(pick){playerLoaded=true;current=pick.dataset.select;currentVideo=currentScene().videoId;render();renderViewer();return;}const vp=t.closest('[data-video]');if(vp){browseAll=false;scope=vp.dataset.video;$('#videoScope').value=scope;selected.clear();renderFacets();render();return;}if(t.closest('#loadVideo')){playerLoaded=true;renderViewer();return;}if(t.closest('#resetAll'))resetConditions();});
 document.addEventListener('input',e=>{if(e.target.classList.contains('facetsearch')){const facet=e.target.closest('.facet'),needle=compact(e.target.value);facet.querySelectorAll('.filtertag').forEach(b=>b.hidden=!compact(b.dataset.tag).includes(needle));}});
 renderRegistry();renderFacets();render(true);document.querySelectorAll('#query,#searchSubmit,#mobileFilter,#videoScope,#highlightToggle,[data-query]').forEach(e=>e.disabled=false);$('#runtimeStatus').textContent='검색 준비됨';window.SCENE_SEARCH_TEST={ALL_SCENES,SCENES,VIDEOS,tokenize,sceneMatches,canon,intervalView,categoryMatches};
@@ -1093,7 +1113,7 @@ try{const saved=localStorage.getItem(key);if(saved){clips=validate(JSON.parse(sa
  const syncFilters=()=>{filterToggle.setAttribute('aria-expanded',String(drawer.open));filterToggle.textContent=drawer.open?'영상·태그 필터 −':'영상·태그 필터 ＋';drawer.hidden=!drawer.open;};filterToggle.addEventListener('click',()=>{drawer.open=!drawer.open;syncFilters();});drawer.addEventListener('toggle',syncFilters);q('.searchrow').append(filterToggle);q('.searchrow').after(drawer);syncFilters();q('#mobileFilter').hidden=true;
  searchColumn.append(search,results);searchLayout.append(searchColumn,mounts.search);panels.search.append(searchLayout);
  const coordLayout=make('div','workspace-coordinator-layout'),coordColumn=make('section','workspace-coordinator-content','workspaceCoordinatorContent');coordLayout.append(coordColumn,mounts.coordinator);panels.coordinator.append(coordLayout);
- if(legacy){legacy.hidden=false;legacy.open=false;legacy.querySelector('summary').firstChild.textContent='대본을 직접 넣어 후보 찾기 ';coordColumn.append(legacy);}
+ if(legacy){legacy.hidden=false;legacy.open=true;legacy.querySelector('summary').firstChild.textContent='대본을 직접 넣어 후보 찾기 ';coordColumn.append(legacy);}
  const editHeading=make('header','workspace-edit-heading');editHeading.innerHTML='<div><h1 class="workspace-task-title">편집</h1><p>같은 프로젝트의 컷 순서·길이·배속을 조절합니다.</p></div><button type="button" data-go-search>클립 더 찾기</button>';panels.edit.append(editHeading);
  const editLayout=make('div','workspace-edit-layout');dock.id='workspaceSequence';dock.classList.add('workspace-sequence');dock.dataset.expanded='true';dock.querySelector('h2').textContent='프로젝트 클립';editLayout.append(mounts.edit,dock);panels.edit.append(editLayout);
  const right=make('section','workspace-preview','workspacePreview');workspace.append(right);right.setAttribute('aria-label','선택 클립 미리보기');right.tabIndex=0;right.append(viewer);
@@ -1109,7 +1129,8 @@ try{const saved=localStorage.getItem(key);if(saved){clips=validate(JSON.parse(sa
  function setTab(key,{focus=false}={}){if(!panels[key])return false;const changing=key!==currentTab;if(changing){scrollPositions[currentTab]=window.scrollY;panelScrollPositions[currentTab]=panels[currentTab].scrollTop;window.CutRadarEdit?.pause();}currentTab=key;workspace.dataset.page=key;workspace.dataset.mode=key==='coordinator'?'scenario':'keyword';Object.entries(panels).forEach(([name,panel])=>panel.hidden=name!==key);navigation.querySelectorAll('[role=tab]').forEach(b=>{const selected=b.dataset.workspaceTab===key;b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});sourceOptions.hidden=key==='edit';if(changing&&!isMobile())panels[key].scrollTop=panelScrollPositions[key];if(focus){q(`#workspaceTab-${key}`).focus({preventScroll:true});if(isMobile())window.scrollTo?.(0,scrollPositions[key]);}return true;}
  function showStep(next,{focus=false}={}){step=next;workspace.dataset.step=next;if(next==='edit')setTab('edit',{focus});else if(next==='search')setTab('search',{focus});else if(next==='preview'){setTab(currentTab);sourceOptions.open=currentTab==='search';if(focus&&isMobile())right.scrollIntoView?.({block:'start'});}return true;}
  function updateDock(){const count=window.CutRadarEdit?.manifest().clips.length||0;q('#workspaceNavCount').textContent=String(count);q('#workspaceTab-edit').setAttribute('aria-label',`편집 · ${count}컷`);dock.dataset.empty=String(count===0);}
- function clipAdded(count){updateDock();confirmation.hidden=false;confirmation.textContent=`${count}컷을 프로젝트에 담았습니다. 편집 탭에서 이어서 조절하세요.`;const n=q('#workspaceTab-edit');n.setAttribute('aria-label',`편집 · ${count}컷`);}
+ let addedTimer=null;
+ function clipAdded(count){updateDock();clearTimeout(addedTimer);confirmation.hidden=false;confirmation.textContent=`${count}컷을 프로젝트에 담았습니다. 편집 탭에서 이어서 조절하세요.`;const n=q('#workspaceTab-edit');n.setAttribute('aria-label',`편집 · ${count}컷`);addedTimer=setTimeout(()=>{confirmation.hidden=true;},4000);}
  function setMode(mode){setTab(mode==='scenario'?'coordinator':'search');if(mode==='scenario'&&legacy)legacy.open=true;}
  navigation.addEventListener('click',e=>{const b=e.target.closest('[data-workspace-tab]');if(b){step=b.dataset.workspaceTab;workspace.dataset.step=step;setTab(step,{focus:true});}});
  navigation.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const buttons=[...navigation.querySelectorAll('[role=tab]')],i=buttons.indexOf(document.activeElement);if(i<0||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const n=e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[n].click();});
@@ -1145,7 +1166,7 @@ $('#facets').before(panel);
 const results=document.createElement('section');results.id='fineResults';results.setAttribute('aria-label','근거별 세부 검색 결과');$('#cards').before(results);
 const selectedFine=()=>[...chosen.values()].some(x=>x.size);
 function groupMatch(c,omit){return [...chosen].every(([axis,values])=>axis===omit||[...values].some(v=>(c.groups[axis]||[]).includes(v)));}
-function textMatch(c,q){const tokens=tokenize(q);const v=videoById(c.videoId);const fields=[v.title,v.game||'',...Object.values(c.groups).flat(),...c.assertions.map(a=>a.searchText??a.value)];return (q.trim().length>=2&&fields.some(f=>String(f).toLocaleLowerCase().includes(q.trim().toLocaleLowerCase())))||tokens.every(t=>fields.some(f=>String(f).split(/\s+/).some(word=>compact(word).includes(compact(t)))||String(f).includes(t)||canon(f)===t));}
+function textMatch(c,q=''){const str=String(q??'');const tokens=tokenize(str);const v=videoById(c.videoId);const fields=[v.title,v.game||'',...Object.values(c.groups).flat(),...c.assertions.map(a=>a.searchText??a.value)];return (str.trim().length>=2&&fields.some(f=>String(f).toLocaleLowerCase().includes(str.trim().toLocaleLowerCase())))||tokens.every(t=>fields.some(f=>String(f).split(/\s+/).some(word=>compact(word).includes(compact(t)))||String(f).includes(t)||canon(f)===t));}
 function base(){return candidates.filter(c=>scopeMatches(c)&&(!highlightsOnly||byKey.get(c.playableEnvelope?.key)?.highlight)&&(!selectedCount()||(byKey.has(c.playableEnvelope?.key)&&categoryMatches(byKey.get(c.playableEnvelope.key))))&&textMatch(c,$('#query').value));}
 function timeText(c){return c.clockBrackets.map(b=>`${b.evidenceId}: ${fmt(b.beforeMs)}${b.beforeMs===b.afterMs?'':'–'+fmt(b.afterMs)}`).join(' · ');}
 function row(c){const v=videoById(c.videoId),first=c.clockBrackets[0],at=first.beforeMs,approx=c.sampleReview?.preciseImageSeekHeld===true,anchor=approx?'대략적 원본 위치':'근거 시각';return `<article class="fine-result" data-fine-result="${esc(c.id)}"><div class="fine-result-head"><button type="button" class="fine-preview-title" data-fine-preview="${esc(c.id)}" aria-label="${esc(v.title)} · ${anchor} ${esc(fmt(at))}부터 미리보기">▶ ${esc(v.title)}</button><a href="${esc(videoLink(v,at))}" target="_blank" rel="noopener noreferrer">${anchor} 원본 ↗</a></div><p class="mono">${esc(timeText(c))}</p>${approx?'<p>이미지·시계 동기 미검증: 정확한 이미지 탐색은 보류했습니다. 표시 시각으로 대략 이동하며 캡처와 같은 프레임 도착을 보장하지 않습니다.</p>':''}${c.partialReview?`<p>PARTIAL · 순차 표본 재생 위치 ${fmt(c.partialReview.playbackStartSeconds*1000)}–${fmt(c.partialReview.playbackEndSeconds*1000)} / 전체 ${fmt(c.partialReview.wholeVideoDurationSeconds*1000)} · 이후 구간 미검토. 재생 위치 비율은 프레임 검수율이 아닙니다.</p>`:''}${c.sampleReview?.samplingMethod==='mixed_paused_points_and_playback'?`<p>SAMPLED · 정지 이동 표본 중심 · 확인 시각 ${fmt(c.sampleReview.playbackStartSeconds*1000)}–${fmt(c.sampleReview.playbackEndSeconds*1000)}. 중간 구간은 연속 재생하지 않았습니다. 사이 프레임·연속 동작·오디오 미검수.</p>`:c.sampleReview?`<p>SAMPLED · 처음부터 종료까지 순차 표본 재생 위치 ${fmt(c.sampleReview.playbackStartSeconds*1000)}–${fmt(c.sampleReview.playbackEndSeconds*1000)} · 전체 프레임·연속 스트림·오디오 미검수. 가림·미포착 구간은 보류했습니다.</p>`:''}${c.sampleReview?.samplingMethod==='mixed_paused_points_and_playback'&&Number.isFinite(c.sampleReview.terminalVisualGapSeconds)?`<p>별도 플레이어 종료 상태 확인 · 마지막 이미지 뒤 ${Number(c.sampleReview.terminalVisualGapSeconds).toFixed(6)}초는 시각 미확인 · 정확한 마지막 프레임 미확인.</p>`:''}${c.sampleReview?.sourceEligibility==='explicit_cinematic_form_images_with_unresolved_combat_holds'?'<p>영상 전체의 시네마틱 확정은 아닙니다. 지정된 정지 표본만 분류하며 유형 미확인 전투장·화질 불명·홍보·UI는 보류하거나 제외합니다.</p>':''}${c.sampleReview?.sourceEligibility==='explicit_cinematic_images_in_mixed_pv'?'<p>혼합 PV · 지정된 시네마틱 정지 표본만 분류하며 게임 UI·홍보 화면은 제외합니다.</p>':''}${c.sampleReview?.samplingMethod==='sequential_samples_with_paused_terminal_gap'?`<p>끝부분에 별도 정지 탐색 표본 ${c.sampleReview.pausedPointSampleCount}개가 있습니다. 중간 탐색 구간은 연속 재생하지 않았습니다. 캡처 시계상 종료 전 ${Number(c.sampleReview.terminalVisualGapSeconds).toFixed(6)}초는 시각 미확인 · 정확한 마지막 프레임 미확인.</p>`:''}${c.sampleReview?.samplingMethod==='sequential_samples_with_paused_endpoint_supplement'?`<p>끝부분 보완은 별도 정지 탐색 표본입니다. 캡처 시계상 종료 전 ${Number(c.sampleReview.terminalVisualGapSeconds).toFixed(6)}초는 시각 미확인 · 정확한 마지막 프레임 미확인.</p>`:''}${c.captureFraming==='partial_original_framing_unverified'?'<p>부분 캡처 · 보이는 국소 세부만 분류. 원본 전체 구도·편집 미확인.</p>':''}<p>${c.kind==='capture_only'?'정지 표본':'순서 있는 표본 비교'} · 캡처 시계값이며 정확한 노출·컷 경계가 아닙니다.</p><div class="fine-tags">${Object.entries(c.groups).map(([axis,values])=>values.map(value=>`<button type="button" data-fine-axis="${esc(axis)}" data-fine-value="${esc(value)}">${esc(index.axes?.[axis]||axis)}: ${esc(value)}</button>`).join('')).join('')}</div><details><summary>관찰 내용과 근거 ID</summary>${c.assertions.map(a=>`<p>${esc(a.subject||'')} · ${esc(a.value)}${a.disposition==='accepted_interpretation'?' [시각적 해석]':''} <small>(${esc(a.id)} · ${esc(a.evidenceIds.join(', '))})</small></p>`).join('')}<p>같은 근거의 여러 인물·소품이 함께 나올 수 있습니다. 표본 사이 모든 프레임·전체 동작 경로·오디오는 미검수입니다.</p></details>${c.playableEnvelope?`<p class="fine-envelope">별도 참고 재생 범위 ${fmt(c.playableEnvelope.startMs)}–${fmt(c.playableEnvelope.endMs)} <button type="button" data-select="${esc(c.playableEnvelope.key)}">기존 구간 재생</button><br>이 범위 전체에 위 관찰이 지속된다는 뜻은 아닙니다.</p>`:'<p class="fine-envelope">검토된 재생 구간은 아직 없습니다. 제목을 누르면 근거 시각부터 자유롭게 확인합니다. 편집 컷은 자동 생성하지 않습니다.</p>'}</article>`;}
@@ -1194,38 +1215,15 @@ update();
  window.CutRadarDirectionPlanner={brief,roles,selection,create};
 })();
 
-/* Card coordinator bridge. Uses the existing editor's append-only v1 validation. */
+/* Direction & Script coordinator. Integrates the native scene matching engine. */
 (()=>{'use strict';
 const host=document.getElementById('workspaceCoordinatorContent');if(!host)return;
-host.innerHTML='<section class="direction-coordinator"><h1 class="workspace-task-title">연출 코디네이터</h1><p>카드를 고르거나 직접 적어 흐름을 좁혀보세요. 완성된 추천은 기존 편집본 뒤에 추가됩니다.</p><iframe id="directorCoordinatorFrame" class="director-coordinator-frame" title="연출 코디네이터 카드 질문" src="director/index.html?embed=1"></iframe><p id="directorTransferStatus" role="status"></p></section>';
-const frame=document.getElementById('directorCoordinatorFrame'),status=document.getElementById('directorTransferStatus'),received=new Map();
-function appendBrief(brief){
- if(!brief||typeof brief.direction!=='string')return;
- const panel=document.getElementById('workspacePanel-edit');if(!panel)return;
- const details=document.createElement('details');details.className='director-edit-notes';
- const summary=document.createElement('summary');summary.textContent='연출 브리프 · 이번에 추가한 컷의 기획 노트';details.append(summary);
- const add=(tag,value)=>{const e=document.createElement(tag);e.textContent=String(value||'');details.append(e)};
- add('p',brief.direction);add('p','대표 순간: '+brief.signature);
- for(const line of (brief.fixed||[]))add('p','확정 입력 · '+line);
- for(const line of (brief.automatic||[]))add('p','자동 보완 · '+line);
- for(const shot of (brief.shots||[])){add('h3',shot.role+' · '+(shot.insufficient?'미연결 · 계획 '+Number(shot.plannedSeconds||0):shot.seconds)+'초');add('p',shot.intent);add('p',shot.camera);add('p',shot.connection);if(shot.insufficient)add('p','소스 부족: '+shot.insufficient)}
- add('p',brief.notice);panel.append(details);
-}
-window.addEventListener('message',e=>{
- if(e.origin!==location.origin||e.source!==frame.contentWindow)return;
- const data=e.data;if(!data||data.type!=='cutradar-director-append'||typeof data.requestId!=='string')return;
- if(received.has(data.requestId)){frame.contentWindow.postMessage(received.get(data.requestId),location.origin);return}
- let reply;
- try{
-  if(data.project?.format!=='cut-radar-edit'||data.project.version!==1||!Array.isArray(data.project.clips)||data.project.clips.length>30)throw Error('지원하지 않는 추천 형식입니다.');
-  const count=window.CutRadarEdit.appendClips(data.project.clips);
-  try{appendBrief(data.project.coordinator?.brief)}catch{status.textContent='클립은 추가됐지만 브리프 표시를 확인해주세요.'}
-  reply={type:'cutradar-director-result',requestId:data.requestId,ok:true,count};
-  status.textContent=`추천 ${count}개를 기존 편집본 뒤에 추가했습니다. 기존 클립은 유지됩니다.`;
-  window.CutRadarWorkspace?.setTab('edit',{focus:true});
- }catch(error){reply={type:'cutradar-director-result',requestId:data.requestId,ok:false,error:error.message};status.textContent='추천 전달 실패: '+error.message}
- received.set(data.requestId,reply);frame.contentWindow.postMessage(reply,location.origin);
-});
+const section=document.createElement('section');
+section.className='direction-coordinator';
+section.innerHTML='<h1 class="workspace-task-title">연출 코디네이터</h1><p>대본이나 지문을 입력하면 파트별(도입·전개·강조 등)로 장면별 연출 의도와 관찰 개념을 분석해 가장 알맞은 레퍼런스 후보를 추천합니다.</p>';
+host.prepend(section);
+const legacy=document.querySelector('.script-coordinator');
+if(legacy){legacy.hidden=false;legacy.open=true;}
 })();
 
 /* Only known catalogue YouTube identities and existing time values become copy links. */
