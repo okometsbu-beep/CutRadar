@@ -121,7 +121,7 @@ BOOTSTRAP = """<script>
    복원한 뒤 app.js를 실행한다. 정적 호스팅(GitHub Pages)과 로컬 서버 모두에서 동작한다. */
 (() => {
   'use strict';
-  const status = text => {
+  const status = (text, progressText) => {
     let el = document.getElementById('cutradarDataStatus');
     if (!el) {
       el = document.createElement('p');
@@ -132,6 +132,12 @@ BOOTSTRAP = """<script>
       document.body.appendChild(el);
     }
     el.textContent = text;
+    const statsEl = document.getElementById('catalogueStats');
+    if (statsEl) statsEl.textContent = text;
+    if (progressText) {
+      const invEl = document.getElementById('inventoryStatus');
+      if (invEl) invEl.textContent = progressText;
+    }
   };
   const fail = error => {
     const box = document.createElement('div');
@@ -142,7 +148,7 @@ BOOTSTRAP = """<script>
       '<code>python3 -m http.server</code> 같은 정적 서버로 열어 주세요.<br><span style="color:#96999f"></span>';
     box.lastElementChild.textContent = String(error && error.message || error);
     document.body.prepend(box);
-    status('데이터 로딩 실패');
+    status('데이터 로딩 실패', '새로고침해 다시 시도해 주세요');
   };
   const getJSON = (path, cache) => fetch(path, { cache: cache }).then(response => {
     if (!response.ok) throw new Error(path.split('/').pop() + ' · HTTP ' + response.status);
@@ -151,7 +157,7 @@ BOOTSTRAP = """<script>
   const load = async () => {
     const index = await getJSON('data/index.json', 'no-cache');
     const chunks = index.chunks || [];
-    status('데이터 불러오는 중 0/' + chunks.length);
+    status('데이터 불러오는 중 0/' + chunks.length, '카탈로그 청크 수신 준비');
     const slots = new Array(index.videoCount || 0);
     let done = 0;
     const queue = chunks.slice();
@@ -161,7 +167,7 @@ BOOTSTRAP = """<script>
         const payload = await getJSON(chunk.path, 'no-cache');
         payload.videos.forEach((video, i) => { slots[payload.orders[i]] = video; });
         done += 1;
-        status('데이터 불러오는 중 ' + done + '/' + chunks.length);
+        status('데이터 불러오는 중 ' + done + '/' + chunks.length, Math.round((done / chunks.length) * 100) + '% 완료 · 잠시만 기다려 주세요');
       }
     };
     await Promise.all(Array.from({ length: Math.min(4, chunks.length) }, worker));
@@ -169,7 +175,7 @@ BOOTSTRAP = """<script>
     if (missing) throw new Error('누락된 영상 ' + missing + '건');
     const { chunks: _chunks, games: _games, generatedAt: _generatedAt, source: _source, ...meta } = index;
     window.SCENE_CATALOGUE = Object.assign({}, meta, { videos: slots });
-    status('카탈로그 ' + slots.length + '편 준비 완료');
+    status('카탈로그 ' + slots.length + '편 준비 완료', '앱 실행 중…');
     await new Promise(resolve => {
       const script = document.createElement('script');
       script.src = 'app.js';
