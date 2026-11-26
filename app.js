@@ -1215,15 +1215,248 @@ update();
  window.CutRadarDirectionPlanner={brief,roles,selection,create};
 })();
 
-/* Direction & Script coordinator. Integrates the native scene matching engine. */
+/* Direction & Script coordinator. Integrates the native sequence planner and script matching engine. */
 (()=>{'use strict';
 const host=document.getElementById('workspaceCoordinatorContent');if(!host)return;
-const section=document.createElement('section');
-section.className='direction-coordinator';
-section.innerHTML='<h1 class="workspace-task-title">연출 코디네이터</h1><p>대본이나 지문을 입력하면 파트별(도입·전개·강조 등)로 장면별 연출 의도와 관찰 개념을 분석해 가장 알맞은 레퍼런스 후보를 추천합니다.</p>';
-host.prepend(section);
 const legacy=document.querySelector('.script-coordinator');
-if(legacy){legacy.hidden=false;legacy.open=true;}
+
+const header=document.createElement('section');
+header.className='direction-coordinator';
+header.innerHTML=`<h1 class="workspace-task-title">연출 코디네이터</h1><p>연출 목적과 시간으로 3~5컷 흐름을 기획하거나, 시나리오 지문에서 파트별 레퍼런스를 찾습니다.</p><div class="coordinator-tool-switcher" role="tablist" aria-label="연출 코디네이터 도구 선택"><button type="button" role="tab" id="coordTabPlanner" class="coord-tool-card" aria-selected="true" aria-controls="coordSectionPlanner"><div class="coord-tool-title"><span class="coord-tool-icon">🎯</span><strong>연출 브리프 플래너</strong></div><p class="coord-tool-desc">목적·감정·초 수로 3~5컷 흐름 자동 기획</p></button><button type="button" role="tab" id="coordTabScript" class="coord-tool-card" aria-selected="false" aria-controls="coordSectionScript"><div class="coord-tool-title"><span class="coord-tool-icon">📝</span><strong>대본으로 찾기</strong></div><p class="coord-tool-desc">씬·지문 텍스트를 파트별로 분석해 추천</p></button></div>`;
+
+const plannerPanel=document.createElement('section');
+plannerPanel.id='coordSectionPlanner';
+plannerPanel.className='coord-panel';
+plannerPanel.setAttribute('role','tabpanel');
+plannerPanel.setAttribute('aria-labelledby','coordTabPlanner');
+plannerPanel.innerHTML=`<form id="directionForm" class="direction-form" onsubmit="return false;"><span class="direction-kicker">3~5컷 시퀀스 흐름 기획</span><div class="direction-fields"><label><span>연출 목적</span><select id="directionPurpose"><option value="balanced">균형 잡힌 서사 전개 (도입–전개–마무리)</option><option value="action" selected>액션·전투 중심 (속도감·타격·역동적 컷)</option><option value="mood">분위기·감정 중심 (여운·인물·정서적 컷)</option></select></label><label><span>전체 길이 (초 단위, 3~600초) <strong id="directionRoleCount" class="direction-role-count">3컷 흐름: 도입 · 행동 전개 · 마무리</strong></span><input type="number" id="directionSeconds" min="3" max="600" step="1" value="15"><div class="direction-chips" role="group" aria-label="추천 길이 선택"><button type="button" class="direction-chip" data-seconds="15">15초 (3컷)</button><button type="button" class="direction-chip" data-seconds="30">30초 (4컷)</button><button type="button" class="direction-chip" data-seconds="60">60초 (4컷)</button><button type="button" class="direction-chip" data-seconds="90">90초 (5컷)</button></div></label><label class="wide"><span>분위기 / 감정 키워드</span><input type="text" id="directionEmotion" placeholder="예: 긴장감, 결의, 비장함, 평온, 분노, 슬픔, 신비로움" value="긴장감"><div class="direction-chips" role="group" aria-label="추천 감정 키워드"><button type="button" class="direction-chip" data-emotion="긴장감">긴장감</button><button type="button" class="direction-chip" data-emotion="결의">결의</button><button type="button" class="direction-chip" data-emotion="비장함">비장함</button><button type="button" class="direction-chip" data-emotion="신비로움">신비로움</button><button type="button" class="direction-chip" data-emotion="역동적">역동적</button><button type="button" class="direction-chip" data-emotion="평온">평온</button></div></label><label><span>시작 연출 (오프닝 컷 지문)</span><input type="text" id="directionOpening" placeholder="예: 먼 곳을 바라보는 인물, 어두운 하늘, 등장" value="먼 곳을 바라보는 인물"></label><label><span>핵심 행동 (전개·강조 컷 지문)</span><input type="text" id="directionAction" placeholder="예: 달려와 도약, 검을 휘두름, 돌진" value="도약하여 검을 휘두름"></label><label class="wide"><span>마무리 연출 (엔딩 컷 지문)</span><input type="text" id="directionEnding" placeholder="예: 칼을 거두며 착지, 여운을 남기는 시선, 페이드" value="착지 후 칼을 거둠"></label></div><div class="direction-form-actions"><button type="button" id="directionPlanSubmit">시퀀스 흐름 기획하기</button><button type="button" id="directionExample">예시 넣기</button><button type="button" id="directionReset">초기화</button><label class="direction-filter-label"><input type="checkbox" id="directionUseFilters"> 현재 영상·태그 필터 적용</label></div><p id="directionStatus" role="status" aria-live="polite"></p></form><div id="directionParts" class="direction-parts" aria-live="polite"></div><div id="directionSummary" class="direction-summary" hidden><div id="directionTotals"></div><button type="button" id="directionSend">+ 전체 시퀀스를 편집 타임라인에 추가</button></div>`;
+
+const scriptPanel=document.createElement('section');
+scriptPanel.id='coordSectionScript';
+scriptPanel.className='coord-panel';
+scriptPanel.setAttribute('role','tabpanel');
+scriptPanel.setAttribute('aria-labelledby','coordTabScript');
+scriptPanel.hidden=true;
+if(legacy){legacy.hidden=false;legacy.open=true;scriptPanel.append(legacy);}
+
+host.replaceChildren(header,plannerPanel,scriptPanel);
+
+const tabPlanner=header.querySelector('#coordTabPlanner'),tabScript=header.querySelector('#coordTabScript');
+function switchCoordTab(target){
+ const isPlanner=target==='planner';
+ tabPlanner.setAttribute('aria-selected',String(isPlanner));
+ tabScript.setAttribute('aria-selected',String(!isPlanner));
+ plannerPanel.hidden=!isPlanner;
+ scriptPanel.hidden=isPlanner;
+ try{sessionStorage.setItem('cutradar_coord_active_tab',target);}catch(_){}
+}
+tabPlanner.addEventListener('click',()=>switchCoordTab('planner'));
+tabScript.addEventListener('click',()=>switchCoordTab('script'));
+[tabPlanner,tabScript].forEach((btn,idx,arr)=>{
+ btn.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+   e.preventDefault();
+   const next=arr[(idx+(e.key==='ArrowRight'?1:-1)+arr.length)%arr.length];
+   next.focus();next.click();
+  }
+ });
+});
+try{const saved=sessionStorage.getItem('cutradar_coord_active_tab');if(saved==='script')switchCoordTab('script');}catch(_){}
+
+const plannerForm=plannerPanel.querySelector('#directionForm');
+const plannerPurpose=plannerPanel.querySelector('#directionPurpose');
+const plannerSeconds=plannerPanel.querySelector('#directionSeconds');
+const plannerRoleCount=plannerPanel.querySelector('#directionRoleCount');
+const plannerEmotion=plannerPanel.querySelector('#directionEmotion');
+const plannerOpening=plannerPanel.querySelector('#directionOpening');
+const plannerAction=plannerPanel.querySelector('#directionAction');
+const plannerEnding=plannerPanel.querySelector('#directionEnding');
+const plannerUseFilters=plannerPanel.querySelector('#directionUseFilters');
+const plannerSubmit=plannerPanel.querySelector('#directionPlanSubmit');
+const plannerExample=plannerPanel.querySelector('#directionExample');
+const plannerReset=plannerPanel.querySelector('#directionReset');
+const plannerStatus=plannerPanel.querySelector('#directionStatus');
+const plannerParts=plannerPanel.querySelector('#directionParts');
+const plannerSummary=plannerPanel.querySelector('#directionSummary');
+const plannerTotals=plannerPanel.querySelector('#directionTotals');
+const plannerSend=plannerPanel.querySelector('#directionSend');
+
+let currentPlan=null;
+
+function updateRoleHint(){
+ const sec=Number(plannerSeconds.value),pur=plannerPurpose.value;
+ if(!Number.isFinite(sec)||sec<3||sec>600){plannerRoleCount.textContent='(전체 길이는 3~600초로 입력해 주세요)';return;}
+ try{
+  const names=CutRadarDirectionPlanner.roles({purpose:pur,seconds:sec});
+  plannerRoleCount.textContent=`${names.length}컷 흐름: ${names.join(' → ')}`;
+ }catch(_){}
+}
+plannerSeconds.addEventListener('input',updateRoleHint);
+plannerPurpose.addEventListener('change',updateRoleHint);
+updateRoleHint();
+
+plannerForm.addEventListener('click',e=>{
+ const chipSec=e.target.closest('[data-seconds]');
+ if(chipSec){plannerSeconds.value=chipSec.dataset.seconds;updateRoleHint();return;}
+ const chipEmo=e.target.closest('[data-emotion]');
+ if(chipEmo){plannerEmotion.value=chipEmo.dataset.emotion;return;}
+});
+
+plannerExample.addEventListener('click',()=>{
+ plannerPurpose.value='action';
+ plannerSeconds.value='15';
+ plannerEmotion.value='긴장감';
+ plannerOpening.value='먼 곳을 바라보는 인물';
+ plannerAction.value='도약하여 검을 휘두름';
+ plannerEnding.value='착지 후 칼을 거둠';
+ updateRoleHint();
+ plannerStatus.textContent='예시 기획안을 채웠습니다. “시퀀스 흐름 기획하기”를 눌러보세요.';
+});
+
+plannerReset.addEventListener('click',()=>{
+ currentPlan=null;
+ plannerPurpose.value='balanced';
+ plannerSeconds.value='15';
+ plannerEmotion.value='';
+ plannerOpening.value='';
+ plannerAction.value='';
+ plannerEnding.value='';
+ plannerUseFilters.checked=false;
+ updateRoleHint();
+ plannerParts.replaceChildren();
+ plannerSummary.hidden=true;
+ plannerStatus.textContent='기획 양식을 초기화했습니다.';
+});
+
+function pool(){
+ return plannerUseFilters.checked?SCENES.filter(s=>scopeMatches(s)&&(!highlightsOnly||s.highlight)&&categoryMatches(s)):SCENES;
+}
+
+function renderPlan(){
+ if(!currentPlan)return;
+ const {brief,parts}=currentPlan;
+ plannerParts.innerHTML=parts.map((p,i)=>{
+  const hasCandidates=p.candidates&&p.candidates.length>0;
+  const c=hasCandidates?p.candidates[p.selected]:null;
+  const s=c?.scene,v=s?videoById(s.videoId):null;
+  const queryDesc=p.query?p.query.split('\n').filter(Boolean).join(' · '):'기본 조건';
+  return `<article class="direction-part" data-part="${i}">
+   <header>
+    <h2>${i+1}. ${esc(p.role)}</h2>
+    <span class="direction-range">약 ${p.seconds}초 기획${s?` (${fmt(s.startMs)}–${fmt(Math.min(s.endMs,s.startMs+Math.round(p.seconds*1000)))})`:''}</span>
+   </header>
+   <p class="direction-query">연출 키워드: <strong>${esc(queryDesc)}</strong></p>
+   ${s?`
+    <h3>${esc(s.title)}</h3>
+    <p>${esc(v?.title||'')} · <span class="mono">${fmt(s.startMs)}–${fmt(s.endMs)}</span></p>
+    <details>
+     <summary>추천 근거 (개념 ${c.hits.length}개 일치 · ${esc(c.label)})</summary>
+     <ul>
+      ${c.hits.slice(0,6).map(h=>`<li><b>${esc(h.label)}</b> ← ${esc(h.kind)} [${esc(h.field||'')}]: ${esc(h.text.length>120?h.text.slice(0,120)+'…':h.text)}</li>`).join('')}
+     </ul>
+    </details>
+    ${p.candidates.length>1?`
+     <div class="direction-choice">
+      <label>
+       다른 후보 선택
+       <select data-direction-pick="${i}">
+        ${p.candidates.map((cand,j)=>`<option value="${j}" ${j===p.selected?'selected':''}>후보 ${j+1}: ${esc(cand.scene.title)} (${cand.hits.length}개 일치)</option>`).join('')}
+       </select>
+      </label>
+      <span>총 ${p.candidates.length}개 후보 중 선택</span>
+     </div>
+    `:''}
+    <div class="direction-part-actions">
+     <button type="button" class="direction-btn-preview" data-direction-preview="${esc(s.key)}">▶ 미리보기</button>
+     <a class="direction-btn-orig" href="${esc(videoLink(v,s.startMs))}" target="_blank" rel="noopener noreferrer">원본 ↗</a>
+     <button type="button" class="direction-btn-add" data-direction-add-part="${i}">+ 이 컷만 타임라인에 추가</button>
+    </div>
+   `:`
+    <p class="direction-warning">이 파트의 키워드(${esc(queryDesc)})를 직접 충족하는 레퍼런스 장면을 찾지 못했습니다. 연출 키워드를 조금 더 일반적인 표현으로 변경하거나 전체 필터를 해제해 보세요.</p>
+   `}
+  </article>`;
+ }).join('');
+
+ const validCount=parts.filter(p=>p.candidates&&p.candidates[p.selected]).length;
+ plannerTotals.innerHTML=`<strong>시퀀스 흐름: 총 ${parts.length}컷 · ${brief.seconds}초 기획</strong> <span>(추천 장면 ${validCount}/${parts.length}컷 연결 완료)</span>`;
+ plannerSummary.hidden=false;
+ plannerStatus.textContent=`총 ${parts.length}컷 시퀀스 흐름 기획 완료 · 추천 장면 ${validCount}개 연결됨`;
+}
+
+plannerSubmit.addEventListener('click',()=>{
+ const input={
+  purpose:plannerPurpose.value,
+  seconds:Number(plannerSeconds.value),
+  emotion:plannerEmotion.value,
+  opening:plannerOpening.value,
+  action:plannerAction.value,
+  ending:plannerEnding.value
+ };
+ try{
+  CutRadarDirectionPlanner.brief(input);
+ }catch(err){
+  plannerStatus.textContent=err.message;
+  return;
+ }
+ const scenePool=pool();
+ plannerStatus.textContent=`총 ${scenePool.length.toLocaleString()}개 장면에서 연출 의도와 관찰 근거를 분석해 흐름을 기획 중…`;
+ setTimeout(()=>{
+  try{
+   currentPlan=CutRadarDirectionPlanner.create(input,scenePool,ScriptCoordinator.rank);
+   renderPlan();
+  }catch(err){
+   plannerStatus.textContent='기획 생성 오류: '+err.message;
+  }
+ },20);
+});
+
+plannerParts.addEventListener('change',e=>{
+ const sel=e.target.closest('select[data-direction-pick]');
+ if(!sel||!currentPlan)return;
+ const partIdx=Number(sel.dataset.directionPick),candIdx=Number(sel.value);
+ currentPlan.parts[partIdx].selected=candIdx;
+ renderPlan();
+});
+
+plannerParts.addEventListener('click',e=>{
+ const pick=e.target.closest('[data-direction-preview]');
+ if(pick){
+  const key=pick.dataset.directionPreview;
+  window.SceneReferenceContext?.show(key);
+  window.CutRadarWorkspace?.showStep('preview',{focus:true});
+  return;
+ }
+ const addPart=e.target.closest('[data-direction-add-part]');
+ if(addPart&&currentPlan){
+  const partIdx=Number(addPart.dataset.directionAddPart);
+  const part=currentPlan.parts[partIdx],cand=part.candidates[part.selected];
+  if(!cand)return;
+  const clip=CutRadarDirectionPlanner.selection(cand,part.seconds);
+  if(clip&&window.CutRadarEdit?.appendClips){
+   try{
+    window.CutRadarEdit.appendClips([clip]);
+    plannerStatus.textContent=`파트 ${partIdx+1} (${cand.scene.title}) 컷을 타임라인에 담았습니다.`;
+   }catch(err){
+    plannerStatus.textContent='타임라인 추가 실패: '+err.message;
+   }
+  }
+  return;
+ }
+});
+
+plannerSend.addEventListener('click',()=>{
+ if(!currentPlan)return;
+ const clips=currentPlan.parts.map(p=>CutRadarDirectionPlanner.selection(p.candidates[p.selected],p.seconds)).filter(Boolean);
+ if(!clips.length){plannerStatus.textContent='타임라인에 추가할 수 있는 유효한 후보 컷이 없습니다.';return;}
+ if(window.CutRadarEdit?.appendClips){
+  try{
+   const count=window.CutRadarEdit.appendClips(clips);
+   plannerStatus.textContent=`${count}개 컷 시퀀스를 편집 타임라인에 추가했습니다. 편집 탭에서 바로 확인하세요!`;
+  }catch(err){
+   plannerStatus.textContent='타임라인 추가 실패: '+err.message;
+  }
+ }
+});
 })();
 
 /* Only known catalogue YouTube identities and existing time values become copy links. */
