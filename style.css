@@ -176,3 +176,58 @@
   .direction-part-actions button,.direction-part-actions a{flex:1 1 auto;justify-content:center}
 }
 
+/* Search results view mode toggle (List vs Grid) */
+.view-mode-toggle{display:inline-flex;align-items:center;border:1px solid #464f5b;border-radius:6px;overflow:hidden;background:#181b1e}
+.view-mode-toggle .toggle-view{border:0;border-radius:0;padding:5px 10px;min-height:32px;background:none;color:#8f9bac;font-size:11px;font-weight:500;display:inline-flex;align-items:center;justify-content:center;transition:background-color .15s,color .15s}
+.view-mode-toggle .toggle-view + .toggle-view{border-left:1px solid #464f5b}
+.view-mode-toggle .toggle-view[aria-pressed=true]{background:#332f27;color:var(--accent);font-weight:650}
+.view-mode-toggle .toggle-view:hover:not([aria-pressed=true]){background:#24282d;color:var(--ink)}
+
+/* Grid view for search results */
+#cards.is-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-items:stretch}
+#cards.is-grid>.empty{grid-column:1/-1}
+
+.workspace-v3 #cards.is-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;align-items:stretch}
+.workspace-v3 #cards.is-grid>.empty{grid-column:1/-1}
+
+.workspace-v3 #cards.is-grid .scenerow{display:flex;flex-direction:column;padding:8px;gap:8px;margin:0;border:1px solid #394149;border-radius:8px;background:var(--panel);position:relative;min-width:0;transition:border-color .15s,background-color .15s}
+.workspace-v3 #cards.is-grid .scenerow:hover{border-color:#5a6674}
+.workspace-v3 #cards.is-grid .scenerow.selected{border:2px solid var(--accent);background:#252927;padding:7px}
+
+.workspace-v3 #cards.is-grid .scene-select.grid-select{display:flex;flex-direction:column;grid-template-columns:none;min-height:0;padding:0;background:none;border:0;border-radius:6px;text-align:left;cursor:pointer;width:100%;min-width:0}
+.workspace-v3 #cards.is-grid .scene-select.grid-select:hover{background:none}
+
+.workspace-v3 #cards.is-grid .grid-thumb{position:relative;width:100%;aspect-ratio:16/9;border-radius:6px;overflow:hidden;background:#111315;display:flex;align-items:center;justify-content:center}
+.workspace-v3 #cards.is-grid .grid-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1}
+.workspace-v3 #cards.is-grid .grid-placeholder{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:#4f5864;font-size:24px;background:#131518}
+.workspace-v3 #cards.is-grid .grid-time{position:absolute;bottom:6px;right:6px;padding:2px 6px;font-size:10px;border-radius:4px;background:rgba(16,17,19,.88);color:var(--ink);letter-spacing:-.02em;z-index:2}
+.workspace-v3 #cards.is-grid .grid-badge{position:absolute;top:6px;left:6px;padding:2px 6px;font-size:9px;font-weight:700;border-radius:4px;background:#7a6336;color:#fff;letter-spacing:.04em;z-index:2}
+.workspace-v3 #cards.is-grid .grid-preview-action{position:absolute;inset:0;background:rgba(16,17,19,.65);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;font-size:12px;font-weight:600;color:var(--ink);z-index:3;gap:6px}
+.workspace-v3 #cards.is-grid .grid-select:hover .grid-preview-action,.workspace-v3 #cards.is-grid .grid-select:focus-visible .grid-preview-action{opacity:1}
+.workspace-v3 #cards.is-grid .scenerow.selected .grid-preview-action{opacity:1;background:rgba(35,42,37,.7)}
+
+.workspace-v3 #cards.is-grid .grid-meta{display:flex;flex-direction:column;gap:3px;padding:8px 2px 2px;min-width:0}
+.workspace-v3 #cards.is-grid .grid-meta .rowvideo{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.workspace-v3 #cards.is-grid .grid-meta .rowtitle{font-size:13px;font-weight:650;color:var(--ink);line-height:1.4;margin:1px 0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.workspace-v3 #cards.is-grid .grid-meta .rowtags{font-size:11px;color:#8c97a5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+
+.workspace-v3 #cards.is-grid .rowlink.grid-link{position:absolute;top:10px;right:10px;z-index:4;width:32px;height:32px;min-height:32px;border:1px solid rgba(80,91,101,.85);border-radius:6px;background:rgba(20,24,28,.88);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;text-decoration:none;transition:color .15s,border-color .15s,background-color .15s}
+.workspace-v3 #cards.is-grid .rowlink.grid-link:hover{color:var(--ink);border-color:var(--accent);background:rgba(30,36,42,.95)}
+
+.workspace-v3 #cards.is-grid .scene-row-actions{display:flex;flex-direction:column;gap:6px;margin-top:auto;padding-top:6px;border-top:1px solid #2a3036;width:100%}
+.workspace-v3 #cards.is-grid .scene-row-actions .edit-add{width:100%;min-height:34px;padding:6px 8px;font-size:11px;font-weight:600;border:1px solid #4a5460;border-radius:6px;background:#222930;color:#d8e0e8;cursor:pointer;text-align:center}
+.workspace-v3 #cards.is-grid .scene-row-actions .edit-add:hover{background:#2e3742;border-color:var(--accent)}
+.workspace-v3 #cards.is-grid .scene-row-actions .cutradar-copy-links{margin:0;padding:0;width:100%}
+.workspace-v3 #cards.is-grid .cutradar-copy-links>div{display:flex;gap:4px}
+.workspace-v3 #cards.is-grid .cutradar-copy-links button{flex:1 1 0;min-height:30px;padding:4px 6px;font-size:10px;border:1px solid #3d454f;border-radius:4px;background:#1c2126;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workspace-v3 #cards.is-grid .cutradar-copy-links button:hover{background:#262e36;color:var(--ink);border-color:#55606d}
+.workspace-v3 #cards.is-grid .cutradar-copy-links small,.workspace-v3 #cards.is-grid .scene-details{display:none}
+
+@media(max-width:600px){
+  .workspace-v3 #cards.is-grid{grid-template-columns:1fr;gap:12px}
+  .workspace-v3 #cards.is-grid .rowlink.grid-link{width:44px;height:44px;min-height:44px;font-size:14px;top:12px;right:12px}
+  .workspace-v3 #cards.is-grid .scene-row-actions .edit-add{min-height:44px;font-size:12px}
+  .workspace-v3 #cards.is-grid .cutradar-copy-links button{min-height:44px;font-size:11px}
+  .view-mode-toggle .toggle-view{min-height:44px;padding:8px 14px;font-size:12px}
+}
+
