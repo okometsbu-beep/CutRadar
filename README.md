@@ -37,6 +37,6 @@ python3 scripts/split_cutradar.py --check .
 
 이슈 댓글에 `@gemini-cli`와 요청을 적으면 `.github/workflows/gemini-assistant.yml`이 Gemini CLI를 실행해 답변하거나 작업 브랜치와 PR을 만듭니다. 저장소 시크릿 `GEMINI_API_KEY`가 필요합니다.
 
-쓰는 모델은 `.gemini/settings.json`에서 정합니다(현재 `gemini-3.8-flash`). 기본 Pro 프리뷰 모델은 무료 API 키에서 503(high demand)으로 재시도만 반복하므로 고정했습니다.
+쓰는 모델은 `.gemini/settings.json`에서 정합니다(현재 `gemini-3.8-flash`). 기본 Pro 프리뷰 모델은 혼잡 시 503(high demand)으로 재시도만 반복하므로 고정했습니다.
 
-무료 API 키는 모델별 일일 요청 한도가 프로젝트 단위로 잡힙니다(한국시간 17:00 리셋): `gemini-3.8-flash` 20회/일, `gemini-4-hydrogen` 20회/일, `gemini-3.5-flash-lite` 500회/일. 실제 개발 루프를 돌리려면 유료 Tier 1(카드 연결, 최소 $5 선불)이 필요합니다.
+API 키는 결제 계정이 연결된 **Tier 1**(유료 등급, 선불 충전·자동 충전 OFF)으로 동작합니다. 무료 등급의 모델별 일일 한도(`gemini-3.8-flash` 20회/일 등)에 걸리지 않으므로 실제 개발 루프에 쓸 수 있습니다. 정확한 잔액·한도는 Google AI Studio의 결제 화면에서 확인합니다.

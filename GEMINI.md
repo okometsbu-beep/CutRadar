@@ -36,5 +36,5 @@ GEMINI.md — 컷레이더 (CutRadar) 프로젝트 규칙
 
 6. GitHub Actions 응답 규칙
 ￼ 이슈 댓글로 실행된 작업은 반드시 마지막에 `gh issue comment "$ISSUE_NUMBER" --body "..."` 로 한국어 결과 댓글을 남긴다. 답변만 하고 끝내지 않는다.
-￼ 모델은 `.gemini/settings.json`에서 `gemini-3.8-flash`로 고정한다. 기본 Pro 프리뷰 모델은 무료 API 키에서 503(high demand) 재시도로 멈춘다.
-￼ 자동 실행은 무료 API 키의 일일 요청 한도(모델당 20회)와 503 혼잡에 걸릴 수 있다. 실패하면 원인 코드(429/503)와 남은 한도 기준을 댓글로 알린다.
+￼ 모델은 `.gemini/settings.json`에서 `gemini-3.8-flash`로 고정한다. 기본 Pro 프리뷰 모델은 혼잡 시 503(high demand) 재시도로 멈춘다.
+￼ API 키는 결제 계정이 연결된 Tier 1(유료 등급, 선불 충전·자동 충전 OFF)로 동작한다. 무료 등급의 모델당 20회/일 한도에 걸리지 않는다. 실패하면 원인 코드(429/503)와 확인한 내용을 댓글로 알린다.
