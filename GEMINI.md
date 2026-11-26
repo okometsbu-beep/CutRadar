@@ -33,3 +33,8 @@ GEMINI.md — 컷레이더 (CutRadar) 프로젝트 규칙
 3. 데스크톱 및 모바일 뷰포트 레이아웃 깨짐 여부 점검
 ￼ GitHub Actions 실행 시: ⁠main⁠ 브랜치에 직접 푸시하지 말고, 새 작업 브랜치에 커밋한 뒤 변경 요약과 확인 사항을 적은 Pull Request(PR)를 연다.
 ￼ 사용자가 직접 확인할 수 없는 작업을 완료했다고 보고하지 않는다.
+
+6. GitHub Actions 응답 규칙
+￼ 이슈 댓글로 실행된 작업은 반드시 마지막에 `gh issue comment "$ISSUE_NUMBER" --body "..."` 로 한국어 결과 댓글을 남긴다. 답변만 하고 끝내지 않는다.
+￼ 모델은 `.gemini/settings.json`에서 `gemini-3.8-flash`로 고정한다. 기본 Pro 프리뷰 모델은 무료 API 키에서 503(high demand) 재시도로 멈춘다.
+￼ 자동 실행은 무료 API 키의 일일 요청 한도(모델당 20회)와 503 혼잡에 걸릴 수 있다. 실패하면 원인 코드(429/503)와 남은 한도 기준을 댓글로 알린다.
